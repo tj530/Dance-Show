@@ -22,7 +22,11 @@ const POSITION_LABELS = {
   'second-half-opener': '★ Act 2 Opener',
 };
 
-function SortableEntry({ entry, routine, conflict, onRemove, onEditIntermission }) {
+function SortableEntry({
+  entry, routine, conflict,
+  onRemove, onEditIntermission,
+  onEditRoutine, onLockPosition,
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: entry.id });
 
@@ -47,6 +51,9 @@ function SortableEntry({ entry, routine, conflict, onRemove, onEditIntermission 
 
   if (!routine) return null;
 
+  const isOpening = routine.position === 'opening';
+  const isFinale  = routine.position === 'finale';
+
   return (
     <li ref={setNodeRef} style={style} className={`lineup-entry ${conflict ? 'conflict' : ''}`}>
       <span className="drag-handle" {...attributes} {...listeners}>⠿</span>
@@ -70,8 +77,27 @@ function SortableEntry({ entry, routine, conflict, onRemove, onEditIntermission 
             ))}
           </div>
         )}
+        <div className="entry-lock-row">
+          <button
+            className={`btn-lock ${isOpening ? 'active' : ''}`}
+            title="Lock as Opening"
+            onClick={() => onLockPosition(routine.id, isOpening ? null : 'opening')}
+          >
+            📌 Opening
+          </button>
+          <button
+            className={`btn-lock ${isFinale ? 'active' : ''}`}
+            title="Lock as Finale"
+            onClick={() => onLockPosition(routine.id, isFinale ? null : 'finale')}
+          >
+            🎭 Finale
+          </button>
+        </div>
       </div>
-      <button className="btn-sm btn-delete" onClick={() => onRemove(entry.id)}>✕</button>
+      <div className="entry-actions">
+        <button className="btn-sm btn-edit" onClick={() => onEditRoutine(routine)}>Edit</button>
+        <button className="btn-sm btn-delete" onClick={() => onRemove(entry.id)}>✕</button>
+      </div>
     </li>
   );
 }
@@ -84,12 +110,13 @@ export default function LineupView({
   onAddIntermission,
   onRemoveEntry,
   onRenameIntermission,
+  onEditRoutine,
+  onLockPosition,
 }) {
   const sensors = useSensors(useSensor(PointerSensor));
 
   const routineMap = Object.fromEntries(routines.map(r => [r.id, r]));
 
-  // Build ordered routines list for conflict detection (skip intermissions)
   const orderedRoutines = lineup
     .filter(e => e.type === 'routine')
     .map(e => routineMap[e.routineId])
@@ -142,6 +169,9 @@ export default function LineupView({
               ⚠ {conflictCount} conflict{conflictCount > 1 ? 's' : ''}
             </span>
           )}
+          {conflictCount === 0 && lineup.length > 0 && (
+            <span className="no-conflict-summary">✓ No conflicts</span>
+          )}
         </div>
       </div>
 
@@ -170,6 +200,8 @@ export default function LineupView({
                         conflict={false}
                         onRemove={onRemoveEntry}
                         onEditIntermission={handleRenameIntermission}
+                        onEditRoutine={onEditRoutine}
+                        onLockPosition={onLockPosition}
                       />
                     ))}
                   </ul>
@@ -181,7 +213,7 @@ export default function LineupView({
                     <h3 className="act-heading">Act {act.actNum}</h3>
                   )}
                   <ul className="lineup-list">
-                    {act.entries.map((entry, idx) => {
+                    {act.entries.map(entry => {
                       const routine = routineMap[entry.routineId];
                       const conflict = routine ? conflictIds.has(routine.id) : false;
                       return (
@@ -192,6 +224,8 @@ export default function LineupView({
                           conflict={conflict}
                           onRemove={onRemoveEntry}
                           onEditIntermission={handleRenameIntermission}
+                          onEditRoutine={onEditRoutine}
+                          onLockPosition={onLockPosition}
                         />
                       );
                     })}

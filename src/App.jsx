@@ -5,6 +5,7 @@ import RoutineList from './components/RoutineList';
 import LineupView from './components/LineupView';
 import ImportPanel from './components/ImportPanel';
 import EditRoutineModal from './components/EditRoutineModal';
+import AddRoutineModal from './components/AddRoutineModal';
 import { generateLineup } from './utils/generator';
 import {
   loadRoutines, saveRoutines,
@@ -18,6 +19,7 @@ export default function App() {
   const [lineup, setLineup] = useState(() => loadLineup());
   const [settings, setSettings] = useState(() => loadSettings());
   const [editingRoutine, setEditingRoutine] = useState(null);
+  const [showAddToLineup, setShowAddToLineup] = useState(false);
   const [activeTab, setActiveTab] = useState('routines');
   const [toast, setToast] = useState('');
 
@@ -44,6 +46,10 @@ export default function App() {
 
   function saveEditedRoutine(updated) {
     setRoutines(prev => prev.map(r => r.id === updated.id ? updated : r));
+    // Sync label in lineup
+    setLineup(prev => prev.map(e =>
+      e.routineId === updated.id ? { ...e, label: updated.title } : e
+    ));
     setEditingRoutine(null);
     showToast('Routine updated');
   }
@@ -58,6 +64,43 @@ export default function App() {
     showToast(`Imported ${imported.length} routine(s)`);
   }
 
+  // ── Lock position from lineup ─────────────────────────────────
+  function handleLockPosition(routineId, position) {
+    setRoutines(prev => prev.map(r => {
+      if (r.id !== routineId) return r;
+      // If locking opening/finale, clear those from any other routine first
+      return { ...r, position: position || null };
+    }));
+    // If locking opening/finale, unset those from other routines
+    if (position === 'opening' || position === 'finale') {
+      setRoutines(prev => prev.map(r => {
+        if (r.id === routineId) return { ...r, position };
+        if (r.position === position) return { ...r, position: null };
+        return r;
+      }));
+    }
+    showToast(position ? `Locked as ${position}` : 'Position unlocked');
+  }
+
+  // ── Add to lineup from lineup tab ─────────────────────────────
+  function handleAddToLineup(routine, isNew) {
+    // Add routine to master list if brand new
+    if (isNew) {
+      setRoutines(prev => [...prev, routine]);
+    }
+    // Append to lineup
+    const entry = {
+      id: `entry-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      type: 'routine',
+      routineId: routine.id,
+      label: routine.title,
+      act: routine.act || 1,
+    };
+    setLineup(prev => [...prev, entry]);
+    setShowAddToLineup(false);
+    showToast(`Added "${routine.title}" to lineup`);
+  }
+
   // ── Lineup ────────────────────────────────────────────────────
   function handleGenerate() {
     if (routines.length === 0) {
@@ -67,7 +110,7 @@ export default function App() {
     const newLineup = generateLineup(routines, settings);
     setLineup(newLineup);
     setActiveTab('lineup');
-    showToast('Lineup generated!');
+    showToast('Lineup optimized!');
   }
 
   function addIntermission() {
@@ -133,6 +176,9 @@ export default function App() {
     showToast('Lineup exported!');
   }
 
+  // Routines currently in lineup (for AddRoutineModal filtering)
+  const lineupRoutineIds = new Set(lineup.map(e => e.routineId).filter(Boolean));
+
   return (
     <div className="app">
       <header className="app-header">
@@ -158,7 +204,7 @@ export default function App() {
           ))}
         </nav>
         <button className="btn-generate" onClick={handleGenerate}>
-          ⚡ Generate Lineup
+          ⚡ Auto-Optimize Lineup
         </button>
       </header>
 
@@ -184,6 +230,9 @@ export default function App() {
         {activeTab === 'lineup' && (
           <div className="lineup-page">
             <div className="lineup-toolbar">
+              <button className="btn-primary btn-add-routine" onClick={() => setShowAddToLineup(true)}>
+                + Add Routine
+              </button>
               <button className="btn-secondary" onClick={clearLineup}>Clear Lineup</button>
               {lineup.length > 0 && (
                 <button className="btn-secondary" onClick={exportLineup}>Export CSV</button>
@@ -197,6 +246,8 @@ export default function App() {
               onAddIntermission={addIntermission}
               onRemoveEntry={removeEntry}
               onRenameIntermission={renameIntermission}
+              onEditRoutine={setEditingRoutine}
+              onLockPosition={handleLockPosition}
             />
           </div>
         )}
@@ -214,6 +265,16 @@ export default function App() {
           numActs={settings.numActs}
           onSave={saveEditedRoutine}
           onClose={() => setEditingRoutine(null)}
+        />
+      )}
+
+      {showAddToLineup && (
+        <AddRoutineModal
+          routines={routines}
+          lineupRoutineIds={lineupRoutineIds}
+          numActs={settings.numActs}
+          onAdd={handleAddToLineup}
+          onClose={() => setShowAddToLineup(false)}
         />
       )}
     </div>

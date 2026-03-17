@@ -5,9 +5,11 @@
  *  - Respect act assignments
  *  - No student appears in consecutive numbers within the conflict buffer distance
  *  - Place intermission(s) between acts
+ *  - Runs multiple iterations and picks the lineup with fewest conflicts
  */
 
 const POSITIONS = ['opening', 'finale', 'first-half-closer', 'second-half-opener'];
+const OPTIMIZE_ITERATIONS = 12;
 
 function shuffleArray(arr) {
   const a = [...arr];
@@ -36,27 +38,47 @@ export function hasConflict(routine, placed, buffer) {
 }
 
 /**
- * Try to insert `routine` into `placed` at any position that satisfies the buffer constraint.
- * Returns new array with routine inserted, or null if impossible.
+ * Count total conflicts across the full placed list.
+ * Lower is better.
  */
-function insertWithoutConflict(routine, placed, buffer) {
-  // Try appending first (most common case)
+function countTotalConflicts(placed, buffer) {
+  let count = 0;
+  for (let i = 0; i < placed.length; i++) {
+    const students = new Set(placed[i].students);
+    for (let j = Math.max(0, i - buffer); j < i; j++) {
+      for (const s of placed[j].students) {
+        if (students.has(s)) { count++; break; }
+      }
+    }
+  }
+  return count;
+}
+
+/**
+ * Try to insert `routine` into `placed` at the best position that minimises conflicts.
+ * Returns new array with routine inserted.
+ */
+function insertAtBestPosition(routine, placed, buffer) {
+  // Try appending (no conflict is optimal)
   if (!hasConflict(routine, placed, buffer)) {
     return [...placed, routine];
   }
-  // Try inserting at every index
-  for (let i = placed.length - 1; i >= 0; i--) {
+
+  // Score every insertion position and pick the one with the fewest conflicts
+  let bestResult = null;
+  let bestScore = Infinity;
+
+  for (let i = 0; i <= placed.length; i++) {
     const candidate = [...placed.slice(0, i), routine, ...placed.slice(i)];
-    // Check window around insertion point
-    let ok = true;
-    for (let j = Math.max(0, i - buffer); j <= Math.min(candidate.length - 1, i + buffer); j++) {
-      if (j === i) continue;
-      const window = candidate.slice(Math.max(0, j - buffer), j);
-      if (hasConflict(candidate[j], window, buffer)) { ok = false; break; }
+    const score = countTotalConflicts(candidate, buffer);
+    if (score < bestScore) {
+      bestScore = score;
+      bestResult = candidate;
     }
-    if (ok) return candidate;
+    if (score === 0) break; // perfect placement found
   }
-  return null;
+
+  return bestResult || [...placed, routine];
 }
 
 /**
@@ -81,15 +103,11 @@ export function detectConflicts(orderedRoutines, buffer) {
 }
 
 /**
- * Main generator – returns array of LineupEntry objects.
- * @param {import('../types').Routine[]} routines
- * @param {import('../types').ShowSettings} settings
- * @returns {import('../types').LineupEntry[]}
+ * Single generation pass – returns LineupEntry[].
  */
-export function generateLineup(routines, settings) {
+function generateOnce(routines, settings) {
   const { conflictBuffer, numActs } = settings;
 
-  // Separate pinned (position) routines from free ones
   const pinned = {};
   POSITIONS.forEach(p => {
     const found = routines.find(r => r.position === p);
@@ -99,36 +117,23 @@ export function generateLineup(routines, settings) {
   const pinnedIds = new Set(Object.values(pinned).map(r => r.id));
   const free = routines.filter(r => !pinnedIds.has(r.id));
 
-  // Split free by act
   const act1Free = free.filter(r => r.act === 1);
   const act2Free = free.filter(r => r.act === 2);
-  const anyFree = shuffleArray(free.filter(r => !r.act));
+  const anyFree  = shuffleArray(free.filter(r => !r.act));
 
-  // Distribute "any" routines evenly
   const half = Math.ceil(anyFree.length / 2);
   const anyForAct1 = numActs === 1 ? anyFree : anyFree.slice(0, half);
-  const anyForAct2 = numActs === 1 ? [] : anyFree.slice(half);
+  const anyForAct2 = numActs === 1 ? []      : anyFree.slice(half);
 
   function buildAct(actRoutines, openingRoutine, closerRoutine) {
-    // Start with opening if provided
     let placed = openingRoutine ? [openingRoutine] : [];
-
-    // Shuffle and insert remaining routines respecting conflict buffer
     const toPlace = shuffleArray([...actRoutines]);
 
     for (const r of toPlace) {
-      const result = insertWithoutConflict(r, placed, conflictBuffer);
-      if (result) {
-        placed = result;
-      } else {
-        // Force append as fallback
-        placed = [...placed, r];
-      }
+      placed = insertAtBestPosition(r, placed, conflictBuffer);
     }
 
-    // Place closer at end if provided
     if (closerRoutine) {
-      // Remove from current position if it snuck in
       placed = placed.filter(r => r.id !== closerRoutine.id);
       placed = [...placed, closerRoutine];
     }
@@ -139,17 +144,13 @@ export function generateLineup(routines, settings) {
   let act1Routines, act2Routines;
 
   if (numActs === 1) {
-    const pool = [...act1Free, ...anyForAct1];
-    act1Routines = buildAct(pool, pinned['opening'], pinned['finale']);
+    act1Routines = buildAct([...act1Free, ...anyForAct1], pinned['opening'], pinned['finale']);
     act2Routines = [];
   } else {
-    const pool1 = [...act1Free, ...anyForAct1];
-    const pool2 = [...act2Free, ...anyForAct2];
-    act1Routines = buildAct(pool1, pinned['opening'], pinned['first-half-closer']);
-    act2Routines = buildAct(pool2, pinned['second-half-opener'], pinned['finale']);
+    act1Routines = buildAct([...act1Free, ...anyForAct1], pinned['opening'], pinned['first-half-closer']);
+    act2Routines = buildAct([...act2Free, ...anyForAct2], pinned['second-half-opener'], pinned['finale']);
   }
 
-  // Build LineupEntry array
   const entries = [];
   let entryId = 1;
 
@@ -175,4 +176,38 @@ export function generateLineup(routines, settings) {
   }
 
   return entries;
+}
+
+/**
+ * Main generator – runs multiple iterations and returns the lineup with the fewest conflicts.
+ * @param {import('../types').Routine[]} routines
+ * @param {import('../types').ShowSettings} settings
+ * @returns {import('../types').LineupEntry[]}
+ */
+export function generateLineup(routines, settings) {
+  const routineMap = Object.fromEntries(routines.map(r => [r.id, r]));
+
+  let bestLineup = null;
+  let bestConflicts = Infinity;
+
+  for (let i = 0; i < OPTIMIZE_ITERATIONS; i++) {
+    const candidate = generateOnce(routines, settings);
+
+    const orderedRoutines = candidate
+      .filter(e => e.type === 'routine')
+      .map(e => routineMap[e.routineId])
+      .filter(Boolean);
+
+    const conflicts = detectConflicts(orderedRoutines, settings.conflictBuffer).size;
+
+    if (conflicts < bestConflicts) {
+      bestConflicts = conflicts;
+      bestLineup = candidate;
+    }
+
+    // Perfect – no conflicts, stop early
+    if (bestConflicts === 0) break;
+  }
+
+  return bestLineup || generateOnce(routines, settings);
 }
