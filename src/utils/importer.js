@@ -5,7 +5,8 @@ import Papa from 'papaparse';
  * DSP exports use columns: Name, Class, Teacher, Location, Room, Days & Time, Birthday, Age
  */
 function isDSPFormat(headers) {
-  const h = new Set(headers);
+  // Lowercase before comparing — meta.fields may contain original-case headers
+  const h = new Set(headers.map(x => x.trim().toLowerCase()));
   return h.has('name') && h.has('class') && h.has('teacher');
 }
 
@@ -91,7 +92,12 @@ export function parseCSV(file) {
       transformHeader: h => h.trim().toLowerCase(),
       complete: ({ data, meta }) => {
         try {
-          if (isDSPFormat(meta.fields)) {
+          // meta.fields may be original-case or post-transform depending on PapaParse version;
+          // fall back to the first data row's keys (always post-transform) if needed
+          const fields = (meta.fields && meta.fields.length)
+            ? meta.fields
+            : Object.keys(data[0] || {});
+          if (isDSPFormat(fields)) {
             resolve({ isDSP: true, classes: parseDSPRows(data) });
           } else {
             resolve({ isDSP: false, routines: data.map((row, i) => parseRow(row, i)) });
