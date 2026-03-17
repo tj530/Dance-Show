@@ -1,10 +1,59 @@
 import Papa from 'papaparse';
 
 /**
+ * Returns true if the header list looks like a Dance Studio Pro enrollment export.
+ * DSP exports one row per student with separate first/last name and class name columns.
+ */
+function isDSPFormat(headers) {
+  const h = new Set(headers);
+  return (h.has('first name') || h.has('firstname')) &&
+         (h.has('last name') || h.has('lastname')) &&
+         (h.has('class name') || h.has('classname') || h.has('class'));
+}
+
+/**
+ * Parse rows from a Dance Studio Pro enrollment export.
+ * Groups by class name and aggregates student full names.
+ */
+function parseDSPRows(data) {
+  const classMap = new Map(); // class name → { title, style, level, students[] }
+
+  for (const row of data) {
+    const firstName = (row['first name'] || row['firstname'] || '').trim();
+    const lastName  = (row['last name']  || row['lastname']  || '').trim();
+    const fullName  = [firstName, lastName].filter(Boolean).join(' ');
+
+    const className = (row['class name'] || row['classname'] || row['class'] || '').trim();
+    if (!className) continue;
+
+    if (!classMap.has(className)) {
+      const style = (
+        row['dance style'] || row['class style'] || row['style'] || ''
+      ).trim();
+      const level = (row['class level'] || row['level'] || '').trim();
+      classMap.set(className, { title: className, style, level, students: [] });
+    }
+
+    if (fullName) classMap.get(className).students.push(fullName);
+  }
+
+  return Array.from(classMap.values()).map((entry, i) => ({
+    id: `r-${Date.now()}-${i}`,
+    title: entry.title,
+    students: entry.students,
+    act: null,
+    position: null,
+    style: entry.style,
+    level: entry.level,
+  }));
+}
+
+/**
  * Parse a CSV file into Routine objects.
- * Expected columns (case-insensitive):
- *   title, students (semicolon-separated), act (optional), position (optional),
- *   style (optional), level (optional)
+ * Supports two formats:
+ *   - Native format: one row per routine with columns title, students, act, position, style, level
+ *   - Dance Studio Pro (DSP): one row per student enrollment with columns
+ *     First Name, Last Name, Class Name, Style, Level (rows grouped by class)
  */
 export function parseCSV(file) {
   return new Promise((resolve, reject) => {
@@ -12,10 +61,14 @@ export function parseCSV(file) {
       header: true,
       skipEmptyLines: true,
       transformHeader: h => h.trim().toLowerCase(),
-      complete: ({ data }) => {
+      complete: ({ data, meta }) => {
         try {
-          const routines = data.map((row, i) => parseRow(row, i));
-          resolve(routines);
+          if (isDSPFormat(meta.fields)) {
+            resolve(parseDSPRows(data));
+          } else {
+            const routines = data.map((row, i) => parseRow(row, i));
+            resolve(routines);
+          }
         } catch (e) {
           reject(e);
         }

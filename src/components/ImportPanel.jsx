@@ -43,8 +43,9 @@ export default function ImportPanel({ onImport }) {
       <h2>Import Routines</h2>
       <p className="hint">
         Upload a <strong>CSV</strong> or <strong>JSON</strong> file.
-        Columns: <code>title</code>, <code>students</code>, <code>act</code> (1/2),{' '}
-        <code>position</code>, <code>style</code>, <code>level</code>
+        Supports <strong>Dance Studio Pro</strong> enrollment exports (auto-detected) or
+        native format with columns: <code>title</code>, <code>students</code>,{' '}
+        <code>act</code> (1/2), <code>position</code>, <code>style</code>, <code>level</code>
       </p>
 
       <div className="field-row">
