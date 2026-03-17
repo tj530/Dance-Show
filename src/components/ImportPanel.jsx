@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { parseCSV, parseJSON, getSampleCSV } from '../utils/importer';
+import { parseCSV, parseJSON, expandDSPClasses, getSampleCSV } from '../utils/importer';
 
 export default function ImportPanel({ onImport }) {
   const fileRef = useRef();
@@ -7,25 +7,57 @@ export default function ImportPanel({ onImport }) {
   const [error, setError] = useState('');
   const [mode, setMode] = useState('add'); // 'add' | 'replace'
 
+  // DSP configure step: null when not active
+  const [dspClasses, setDspClasses] = useState(null); // DSPClass[]
+  const [dspCounts, setDspCounts] = useState({});     // title → 1|2|3
+
   async function handleFile(e) {
     const file = e.target.files[0];
     if (!file) return;
     setStatus('');
     setError('');
+    setDspClasses(null);
 
     try {
-      let routines;
       if (file.name.endsWith('.json')) {
-        routines = await parseJSON(file);
+        const routines = await parseJSON(file);
+        onImport(routines, mode);
+        setStatus(`✓ Imported ${routines.length} routine(s)`);
       } else {
-        routines = await parseCSV(file);
+        const result = await parseCSV(file);
+        if (result.isDSP) {
+          // Initialise all counts to 1 and show the configure step
+          const initial = {};
+          result.classes.forEach(c => { initial[c.title] = 1; });
+          setDspClasses(result.classes);
+          setDspCounts(initial);
+        } else {
+          onImport(result.routines, mode);
+          setStatus(`✓ Imported ${result.routines.length} routine(s)`);
+        }
       }
-      onImport(routines, mode);
-      setStatus(`✓ Imported ${routines.length} routine(s)`);
     } catch (err) {
       setError(`Import failed: ${err.message}`);
     }
     e.target.value = '';
+  }
+
+  function confirmDSP() {
+    const routines = expandDSPClasses(dspClasses, dspCounts);
+    onImport(routines, mode);
+    const total = routines.length;
+    setStatus(`✓ Imported ${total} routine(s) from ${dspClasses.length} class(es)`);
+    setDspClasses(null);
+    setDspCounts({});
+  }
+
+  function cancelDSP() {
+    setDspClasses(null);
+    setDspCounts({});
+  }
+
+  function setCount(title, count) {
+    setDspCounts(prev => ({ ...prev, [title]: count }));
   }
 
   function downloadTemplate() {
@@ -38,6 +70,48 @@ export default function ImportPanel({ onImport }) {
     URL.revokeObjectURL(url);
   }
 
+  // ── DSP configure step ──────────────────────────────────────────────────────
+  if (dspClasses) {
+    return (
+      <div className="import-panel card">
+        <h2>Configure Routines per Class</h2>
+        <p className="hint">
+          How many numbers does each class perform in the show?
+        </p>
+
+        <div className="dsp-class-list">
+          {dspClasses.map(({ title, students }) => (
+            <div key={title} className="dsp-class-row">
+              <span className="dsp-class-name">{title}</span>
+              <span className="dsp-student-count">{students.length} student{students.length !== 1 ? 's' : ''}</span>
+              <div className="btn-group">
+                {[1, 2, 3].map(n => (
+                  <button
+                    key={n}
+                    className={dspCounts[title] === n ? 'active' : ''}
+                    onClick={() => setCount(title, n)}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="import-actions">
+          <button className="btn-primary" onClick={confirmDSP}>
+            Confirm Import
+          </button>
+          <button className="btn-secondary" onClick={cancelDSP}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Normal upload step ──────────────────────────────────────────────────────
   return (
     <div className="import-panel card">
       <h2>Import Routines</h2>

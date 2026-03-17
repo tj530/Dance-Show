@@ -421,6 +421,18 @@ body {
 .import-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .import-actions .btn-primary { width: auto; margin-top: 0; }
 
+.dsp-class-list { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.dsp-class-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.dsp-class-name { flex: 1; font-weight: 600; }
+.dsp-student-count { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+
 .success { color: var(--success); margin-top: 10px; font-weight: 600; }
 .error   { color: var(--danger);  margin-top: 8px;  font-size: 13px; }
 

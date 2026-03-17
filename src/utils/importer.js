@@ -17,6 +17,14 @@ function isDSPFormat(headers) {
  * contain a full name in the "Name" column and the class name in the "Class" column.
  * This function groups rows by class name and collects student names.
  */
+/**
+ * @typedef {{ title: string, students: string[] }} DSPClass
+ */
+
+/**
+ * Extract class objects from DSP rows (one entry per unique class name).
+ * @returns {DSPClass[]}
+ */
 function parseDSPRows(data) {
   const classMap = new Map(); // preserves insertion order (class sequence)
 
@@ -26,8 +34,7 @@ function parseDSPRows(data) {
     // Skip repeated header rows (Name, Class, Teacher … appear mid-file)
     if (nameVal.toLowerCase() === 'name') continue;
 
-    // Skip "Average Age" summary rows — they appear in the first (unlabeled) column
-    // PapaParse uses '' or an auto-key for a blank header; check all values as fallback
+    // Skip "Average Age" summary rows
     const allValues = Object.values(row).join(' ').toLowerCase();
     if (allValues.includes('average age')) continue;
 
@@ -40,24 +47,41 @@ function parseDSPRows(data) {
     classMap.get(className).students.push(nameVal);
   }
 
-  return Array.from(classMap.values()).map((entry, i) => ({
-    id: `r-${Date.now()}-${i}`,
-    title: entry.title,
-    students: entry.students,
-    act: null,
-    position: null,
-    style: '',
-    level: '',
-  }));
+  return Array.from(classMap.values());
 }
 
 /**
- * Parse a CSV file into Routine objects.
- * Supports two formats:
- *   - Native format: one row per routine with columns title, students, act, position, style, level
- *   - Dance Studio Pro (DSP): one row per student enrollment with columns
- *     Name, Class, Teacher, Location, Room, Days & Time, Birthday, Age
- *     Multiple class sections are separated by repeated header rows and "Average Age" rows.
+ * Expand DSP classes into Routine objects using per-class counts.
+ * count=1 → one routine titled "ClassName"
+ * count>1 → routines titled "ClassName 1", "ClassName 2", …
+ * @param {DSPClass[]} classes
+ * @param {Record<string,number>} counts  map of title → number of routines (1-3)
+ * @returns {import('../types').Routine[]}
+ */
+export function expandDSPClasses(classes, counts) {
+  const routines = [];
+  classes.forEach(({ title, students }) => {
+    const count = counts[title] ?? 1;
+    for (let n = 1; n <= count; n++) {
+      routines.push({
+        id: `r-${Date.now()}-${routines.length}`,
+        title: count === 1 ? title : `${title} ${n}`,
+        students,
+        act: null,
+        position: null,
+        style: '',
+        level: '',
+      });
+    }
+  });
+  return routines;
+}
+
+/**
+ * Parse a CSV file.
+ * Returns one of:
+ *   { isDSP: true,  classes: DSPClass[] }   — Dance Studio Pro export
+ *   { isDSP: false, routines: Routine[] }   — native format
  */
 export function parseCSV(file) {
   return new Promise((resolve, reject) => {
@@ -68,10 +92,9 @@ export function parseCSV(file) {
       complete: ({ data, meta }) => {
         try {
           if (isDSPFormat(meta.fields)) {
-            resolve(parseDSPRows(data));
+            resolve({ isDSP: true, classes: parseDSPRows(data) });
           } else {
-            const routines = data.map((row, i) => parseRow(row, i));
-            resolve(routines);
+            resolve({ isDSP: false, routines: data.map((row, i) => parseRow(row, i)) });
           }
         } catch (e) {
           reject(e);
