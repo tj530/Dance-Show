@@ -2,39 +2,42 @@ import Papa from 'papaparse';
 
 /**
  * Returns true if the header list looks like a Dance Studio Pro enrollment export.
- * DSP exports one row per student with separate first/last name and class name columns.
+ * DSP exports use columns: Name, Class, Teacher, Location, Room, Days & Time, Birthday, Age
  */
 function isDSPFormat(headers) {
   const h = new Set(headers);
-  return (h.has('first name') || h.has('firstname')) &&
-         (h.has('last name') || h.has('lastname')) &&
-         (h.has('class name') || h.has('classname') || h.has('class'));
+  return h.has('name') && h.has('class') && h.has('teacher');
 }
 
 /**
  * Parse rows from a Dance Studio Pro enrollment export.
- * Groups by class name and aggregates student full names.
+ *
+ * DSP exports have multiple class sections in one file. Each section starts with
+ * a repeated header row and ends with an "Average Age" summary row. Student rows
+ * contain a full name in the "Name" column and the class name in the "Class" column.
+ * This function groups rows by class name and collects student names.
  */
 function parseDSPRows(data) {
-  const classMap = new Map(); // class name → { title, style, level, students[] }
+  const classMap = new Map(); // preserves insertion order (class sequence)
 
   for (const row of data) {
-    const firstName = (row['first name'] || row['firstname'] || '').trim();
-    const lastName  = (row['last name']  || row['lastname']  || '').trim();
-    const fullName  = [firstName, lastName].filter(Boolean).join(' ');
+    const nameVal = (row['name'] || '').trim();
 
-    const className = (row['class name'] || row['classname'] || row['class'] || '').trim();
-    if (!className) continue;
+    // Skip repeated header rows (Name, Class, Teacher … appear mid-file)
+    if (nameVal.toLowerCase() === 'name') continue;
+
+    // Skip "Average Age" summary rows — they appear in the first (unlabeled) column
+    // PapaParse uses '' or an auto-key for a blank header; check all values as fallback
+    const allValues = Object.values(row).join(' ').toLowerCase();
+    if (allValues.includes('average age')) continue;
+
+    const className = (row['class'] || '').trim();
+    if (!nameVal || !className) continue;
 
     if (!classMap.has(className)) {
-      const style = (
-        row['dance style'] || row['class style'] || row['style'] || ''
-      ).trim();
-      const level = (row['class level'] || row['level'] || '').trim();
-      classMap.set(className, { title: className, style, level, students: [] });
+      classMap.set(className, { title: className, students: [] });
     }
-
-    if (fullName) classMap.get(className).students.push(fullName);
+    classMap.get(className).students.push(nameVal);
   }
 
   return Array.from(classMap.values()).map((entry, i) => ({
@@ -43,8 +46,8 @@ function parseDSPRows(data) {
     students: entry.students,
     act: null,
     position: null,
-    style: entry.style,
-    level: entry.level,
+    style: '',
+    level: '',
   }));
 }
 
@@ -53,7 +56,8 @@ function parseDSPRows(data) {
  * Supports two formats:
  *   - Native format: one row per routine with columns title, students, act, position, style, level
  *   - Dance Studio Pro (DSP): one row per student enrollment with columns
- *     First Name, Last Name, Class Name, Style, Level (rows grouped by class)
+ *     Name, Class, Teacher, Location, Room, Days & Time, Birthday, Age
+ *     Multiple class sections are separated by repeated header rows and "Average Age" rows.
  */
 export function parseCSV(file) {
   return new Promise((resolve, reject) => {
