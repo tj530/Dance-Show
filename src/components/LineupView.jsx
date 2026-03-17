@@ -112,6 +112,7 @@ export default function LineupView({
   onRenameIntermission,
   onEditRoutine,
   onLockPosition,
+  liveOptimize,
 }) {
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -171,6 +172,9 @@ export default function LineupView({
           )}
           {conflictCount === 0 && lineup.length > 0 && (
             <span className="no-conflict-summary">✓ No conflicts</span>
+          )}
+          {liveOptimize && (
+            <span className="live-badge">⟳ Live</span>
           )}
         </div>
       </div>

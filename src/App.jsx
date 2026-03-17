@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import SettingsPanel from './components/SettingsPanel';
 import RoutineForm from './components/RoutineForm';
 import RoutineList from './components/RoutineList';
@@ -22,10 +22,30 @@ export default function App() {
   const [showAddToLineup, setShowAddToLineup] = useState(false);
   const [activeTab, setActiveTab] = useState('routines');
   const [toast, setToast] = useState('');
+  const [liveOptimize, setLiveOptimize] = useState(false);
+  const liveOptimizeRef = useRef(liveOptimize);
+  const debounceRef = useRef(null);
 
   useEffect(() => { saveRoutines(routines); }, [routines]);
   useEffect(() => { saveLineup(lineup); }, [lineup]);
   useEffect(() => { saveSettings(settings); }, [settings]);
+
+  // Keep ref in sync so the debounce callback sees the latest value
+  useEffect(() => { liveOptimizeRef.current = liveOptimize; }, [liveOptimize]);
+
+  // ── Live optimize effect ──────────────────────────────────────
+  useEffect(() => {
+    if (!liveOptimize || routines.length === 0) return;
+
+    // Debounce: wait 600 ms after the last change before re-optimizing
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      if (!liveOptimizeRef.current) return;
+      setLineup(generateLineup(routines, settings));
+    }, 600);
+
+    return () => clearTimeout(debounceRef.current);
+  }, [routines, settings, liveOptimize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function showToast(msg) {
     setToast(msg);
@@ -99,6 +119,22 @@ export default function App() {
     setLineup(prev => [...prev, entry]);
     setShowAddToLineup(false);
     showToast(`Added "${routine.title}" to lineup`);
+  }
+
+  // ── Live optimize toggle ──────────────────────────────────────
+  function toggleLiveOptimize() {
+    setLiveOptimize(prev => {
+      const next = !prev;
+      if (next && routines.length > 0) {
+        // Immediately optimize on enable
+        setLineup(generateLineup(routines, settings));
+        showToast('Live optimize ON — lineup will auto-update');
+        setActiveTab('lineup');
+      } else {
+        showToast('Live optimize OFF — drag to arrange manually');
+      }
+      return next;
+    });
   }
 
   // ── Lineup ────────────────────────────────────────────────────
@@ -203,8 +239,16 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <button
+          className={`btn-live-optimize ${liveOptimize ? 'active' : ''}`}
+          onClick={toggleLiveOptimize}
+          title={liveOptimize ? 'Live optimize is ON — click to disable' : 'Enable live optimize'}
+        >
+          {liveOptimize ? '⟳ Live' : '⟳ Live Optimize'}
+          {liveOptimize && <span className="live-pulse" />}
+        </button>
         <button className="btn-generate" onClick={handleGenerate}>
-          ⚡ Auto-Optimize Lineup
+          ⚡ Optimize Now
         </button>
       </header>
 
@@ -248,6 +292,7 @@ export default function App() {
               onRenameIntermission={renameIntermission}
               onEditRoutine={setEditingRoutine}
               onLockPosition={handleLockPosition}
+              liveOptimize={liveOptimize}
             />
           </div>
         )}
