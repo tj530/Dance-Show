@@ -641,9 +641,79 @@ body {
   padding: 2px 6px;
 }
 
+/* ── Visualization Panel ─────────────────────────────────────── */
+.viz-panel { padding: 24px; max-width: 960px; margin: 0 auto; }
+
+.viz-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--surface2);
+  padding: 4px;
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.viz-tab {
+  flex: 1;
+  min-width: 120px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 8px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.viz-tab:hover { color: var(--text); background: var(--border); }
+.viz-tab.active { background: var(--accent); color: #0f0f14; font-weight: 700; }
+
+.viz-content { display: flex; flex-direction: column; gap: 12px; }
+
+.viz-subtitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.viz-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.viz-empty {
+  font-size: 14px;
+  color: var(--text-muted);
+  padding: 40px;
+  text-align: center;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+}
+
+.viz-chart-wrap {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.viz-svg { display: block; width: 100%; height: auto; }
+
+.viz-scroll {
+  overflow-x: auto;
+  border-radius: var(--radius);
+}
+
 /* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .two-col { grid-template-columns: 1fr; }
   .app-header { flex-wrap: wrap; gap: 8px; }
   .app-header h1 { font-size: 16px; }
+  .viz-tab { min-width: 80px; font-size: 12px; }
 }
