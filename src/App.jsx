@@ -174,29 +174,34 @@ export default function App() {
   const lineupRoutineIds = new Set(lineup.map(e => e.routineId).filter(Boolean));
   const ALL_TABS = ['routines', 'lineup', 'analytics', 'import'];
 
+  const TAB_LABELS = { routines: 'Routines', lineup: 'Lineup', analytics: 'Analytics', import: 'Import' };
+
   return (
     <div className="app">
       <header className="app-header">
         <div className="header-left">
-          <span className="logo">💃</span>
+          <div className="logo-mark">DS</div>
           <h1>{settings.showName}</h1>
         </div>
         <nav className="tabs">
           {ALL_TABS.map(tab => (
             <button key={tab} className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {TAB_LABELS[tab]}
               {tab === 'routines' && routines.length > 0 && <span className="badge">{routines.length}</span>}
               {tab === 'lineup'   && lineup.length   > 0 && <span className="badge">{lineup.filter(e => e.type === 'routine').length}</span>}
             </button>
           ))}
         </nav>
-        <button className={`btn-live-optimize ${liveOptimize ? 'active' : ''}`}
-          onClick={toggleLiveOptimize}
-          title={liveOptimize ? 'Live optimize ON — click to disable' : 'Enable live optimize'}>
-          {liveOptimize ? '⟳ Live' : '⟳ Live Optimize'}
-          {liveOptimize && <span className="live-pulse" />}
-        </button>
-        <button className="btn-generate" onClick={handleGenerate}>⚡ Optimize Now</button>
+        <div className="header-actions">
+          <button
+            className={`btn-live-optimize ${liveOptimize ? 'active' : ''}`}
+            onClick={toggleLiveOptimize}
+            title={liveOptimize ? 'Auto-optimize is on — click to turn off' : 'Turn on auto-optimize'}>
+            {liveOptimize ? 'Auto: On' : 'Auto-Optimize'}
+            {liveOptimize && <span className="live-pulse" />}
+          </button>
+          <button className="btn-generate" onClick={handleGenerate}>Optimize Lineup</button>
+        </div>
       </header>
 
       {toast && <div className="toast">{toast}</div>}
@@ -217,8 +222,8 @@ export default function App() {
         {activeTab === 'lineup' && (
           <div className="lineup-page">
             <div className="lineup-toolbar">
-              <button className="btn-primary btn-add-routine" onClick={() => setShowAddToLineup(true)}>+ Add Routine</button>
-              <button className="btn-secondary" onClick={clearLineup}>Clear Lineup</button>
+              <button className="btn-primary btn-add-routine" onClick={() => setShowAddToLineup(true)}>Add Routine</button>
+              <button className="btn-secondary" onClick={clearLineup}>Clear</button>
               {lineup.length > 0 && <button className="btn-secondary" onClick={exportLineup}>Export CSV</button>}
             </div>
             <LineupView

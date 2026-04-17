@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 
 const POSITIONS = [
-  { value: '', label: 'None' },
+  { value: '', label: 'No special position' },
   { value: 'opening', label: 'Opening' },
   { value: 'finale', label: 'Finale' },
-  { value: 'first-half-closer', label: 'First-Half Closer' },
-  { value: 'second-half-opener', label: 'Second-Half Opener' },
+  { value: 'first-half-closer', label: 'Act 1 Closer' },
+  { value: 'second-half-opener', label: 'Act 2 Opener' },
 ];
 
 const blank = () => ({
@@ -59,20 +59,23 @@ export default function AddRoutineModal({ routines, lineupRoutineIds, numActs, o
             className={`mode-tab ${mode === 'existing' ? 'active' : ''}`}
             onClick={() => setMode('existing')}
           >
-            From Existing ({available.length})
+            Pick existing {available.length > 0 && `(${available.length})`}
           </button>
           <button
             className={`mode-tab ${mode === 'new' ? 'active' : ''}`}
             onClick={() => setMode('new')}
           >
-            Create New
+            Create new
           </button>
         </div>
 
         {mode === 'existing' && (
           <div className="existing-routines-list">
             {available.length === 0 ? (
-              <p className="empty">All routines are already in the lineup.</p>
+              <div className="list-empty">
+                <p className="empty-heading">All routines are in the lineup</p>
+                <p className="empty-sub">Switch to "Create new" to add a brand-new routine.</p>
+              </div>
             ) : (
               <ul>
                 {available.map(r => (
@@ -89,7 +92,7 @@ export default function AddRoutineModal({ routines, lineupRoutineIds, numActs, o
                       </div>
                     </div>
                     <button className="btn-sm btn-edit" onClick={() => handleAddExisting(r)}>
-                      + Add
+                      Add
                     </button>
                   </li>
                 ))}
@@ -106,8 +109,8 @@ export default function AddRoutineModal({ routines, lineupRoutineIds, numActs, o
               <input value={form.title} onChange={e => set('title', e.target.value)} placeholder="Routine name" />
             </div>
             <div className="field-row">
-              <label>Dancers <span className="hint">(separate with ; or ,)</span></label>
-              <input value={form.students} onChange={e => set('students', e.target.value)} placeholder="Alice; Bob; Carol" />
+              <label>Dancers <span className="field-hint">separate with comma or semicolon</span></label>
+              <input value={form.students} onChange={e => set('students', e.target.value)} placeholder="Alice, Bob, Carol" />
             </div>
             <div className="field-row">
               <label>Style</label>
@@ -121,7 +124,7 @@ export default function AddRoutineModal({ routines, lineupRoutineIds, numActs, o
               <div className="field-row">
                 <label>Act</label>
                 <select value={form.act} onChange={e => set('act', e.target.value)}>
-                  <option value="">Either Act</option>
+                  <option value="">Either act</option>
                   <option value="1">Act 1</option>
                   <option value="2">Act 2</option>
                 </select>
@@ -135,7 +138,7 @@ export default function AddRoutineModal({ routines, lineupRoutineIds, numActs, o
                 ))}
               </select>
             </div>
-            <button type="submit" className="btn-primary">Create & Add to Lineup</button>
+            <button type="submit" className="btn-primary">Create and Add to Lineup</button>
           </form>
         )}
 

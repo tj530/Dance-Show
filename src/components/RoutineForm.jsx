@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 
 const POSITIONS = [
-  { value: '', label: 'None' },
+  { value: '', label: 'No special position' },
   { value: 'opening', label: 'Opening' },
   { value: 'finale', label: 'Finale' },
-  { value: 'first-half-closer', label: 'First-Half Closer' },
-  { value: 'second-half-opener', label: 'Second-Half Opener' },
+  { value: 'first-half-closer', label: 'Act 1 Closer' },
+  { value: 'second-half-opener', label: 'Act 2 Opener' },
 ];
 
 const blank = () => ({
@@ -23,7 +23,7 @@ export default function RoutineForm({ onAdd, numActs }) {
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (!form.title.trim()) { setError('Title is required'); return; }
+    if (!form.title.trim()) { setError('Please enter a routine title.'); return; }
     const students = form.students
       .split(/[;,|]/)
       .map(s => s.trim())
@@ -48,30 +48,49 @@ export default function RoutineForm({ onAdd, numActs }) {
 
       <div className="form-grid">
         <div className="field-row">
-          <label>Title *</label>
-          <input value={form.title} onChange={e => set('title', e.target.value)} placeholder="Routine name" />
+          <label>Routine title <span className="field-required">*</span></label>
+          <input
+            value={form.title}
+            onChange={e => set('title', e.target.value)}
+            placeholder="e.g. Swan Lake"
+          />
         </div>
 
         <div className="field-row">
-          <label>Students <span className="hint">(separate with ; or ,)</span></label>
-          <input value={form.students} onChange={e => set('students', e.target.value)} placeholder="Alice; Bob; Carol" />
+          <label>
+            Dancers
+            <span className="field-hint">separate with comma or semicolon</span>
+          </label>
+          <input
+            value={form.students}
+            onChange={e => set('students', e.target.value)}
+            placeholder="Alice, Bob, Carol"
+          />
         </div>
 
         <div className="field-row">
           <label>Style</label>
-          <input value={form.style} onChange={e => set('style', e.target.value)} placeholder="Ballet, Hip-Hop…" />
+          <input
+            value={form.style}
+            onChange={e => set('style', e.target.value)}
+            placeholder="Ballet, Hip-Hop, Contemporary…"
+          />
         </div>
 
         <div className="field-row">
           <label>Level</label>
-          <input value={form.level} onChange={e => set('level', e.target.value)} placeholder="Beginner, Advanced…" />
+          <input
+            value={form.level}
+            onChange={e => set('level', e.target.value)}
+            placeholder="Beginner, Intermediate, Advanced…"
+          />
         </div>
 
         {numActs > 1 && (
           <div className="field-row">
-            <label>Act</label>
+            <label>Act preference</label>
             <select value={form.act} onChange={e => set('act', e.target.value)}>
-              <option value="">Either Act</option>
+              <option value="">Either act</option>
               <option value="1">Act 1</option>
               <option value="2">Act 2</option>
             </select>
@@ -79,7 +98,7 @@ export default function RoutineForm({ onAdd, numActs }) {
         )}
 
         <div className="field-row">
-          <label>Special Position</label>
+          <label>Special position</label>
           <select value={form.position} onChange={e => set('position', e.target.value)}>
             {POSITIONS.map(p => (
               <option key={p.value} value={p.value}>{p.label}</option>

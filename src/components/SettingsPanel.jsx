@@ -8,16 +8,17 @@ export default function SettingsPanel({ settings, onChange }) {
       <h2>Show Settings</h2>
 
       <div className="field-row">
-        <label>Show Name</label>
+        <label>Show name</label>
         <input
           type="text"
           value={showName}
           onChange={e => onChange({ ...settings, showName: e.target.value })}
+          placeholder="e.g. Annual Dance Showcase"
         />
       </div>
 
       <div className="field-row">
-        <label>Number of Acts</label>
+        <label>Number of acts</label>
         <div className="btn-group">
           {[1, 2].map(n => (
             <button
@@ -25,7 +26,7 @@ export default function SettingsPanel({ settings, onChange }) {
               className={numActs === n ? 'active' : ''}
               onClick={() => onChange({ ...settings, numActs: n })}
             >
-              {n} Act{n > 1 ? 's' : ''}
+              {n} {n === 1 ? 'Act' : 'Acts'}
             </button>
           ))}
         </div>
@@ -33,8 +34,8 @@ export default function SettingsPanel({ settings, onChange }) {
 
       <div className="field-row">
         <label>
-          Conflict Buffer
-          <span className="hint"> – min routines between same student</span>
+          Conflict buffer
+          <span className="field-hint">routines between same dancer</span>
         </label>
         <div className="btn-group">
           {[1, 2, 3].map(n => (
