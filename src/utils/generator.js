@@ -4,6 +4,9 @@
  * Penalty equation:
  *   penalty(i, j) = sharedStudents(i,j) × (buffer − gap + 1)²
  *
+ * Additional penalty: adjacent solos/duos/trios (1–3 performers) each cost
+ * SMALL_GROUP_PENALTY points so the optimizer separates them with larger groups.
+ *
  * Pipeline per act:
  *   1. Build conflict-weight graph
  *   2. Generate SEEDS initial orderings (conflict-sorted + random)
@@ -12,19 +15,29 @@
  *   5. Return best result; emit score log for visualization
  */
 
-const POSITIONS = ['opening', 'finale', 'first-half-closer', 'second-half-opener'];
-const SEEDS     = 8;
+const POSITIONS         = ['opening', 'finale', 'first-half-closer', 'second-half-opener'];
+const SEEDS             = 8;
+const SMALL_GROUP_PENALTY = 6; // cost per adjacent small-group pair
 
-// ── Scoring ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function sharedStudentCount(r1, r2) {
   const s = new Set(r1.students);
   return r2.students.filter(x => s.has(x)).length;
 }
 
+function isSmallGroup(routine) {
+  const n = routine.students.length;
+  return n >= 1 && n <= 3;
+}
+
+// ── Scoring ───────────────────────────────────────────────────────────────────
+
 export function scoreLineup(orderedRoutines, buffer) {
   let score = 0;
+
   for (let i = 0; i < orderedRoutines.length; i++) {
+    // Student conflict penalty
     for (let j = Math.max(0, i - buffer); j < i; j++) {
       const shared = sharedStudentCount(orderedRoutines[i], orderedRoutines[j]);
       if (shared > 0) {
@@ -33,8 +46,24 @@ export function scoreLineup(orderedRoutines, buffer) {
         score += shared * violation * violation;
       }
     }
+    // Small-group adjacency penalty
+    if (i > 0 && isSmallGroup(orderedRoutines[i]) && isSmallGroup(orderedRoutines[i - 1])) {
+      score += SMALL_GROUP_PENALTY;
+    }
   }
+
   return score;
+}
+
+export function detectSmallGroupAdjacency(orderedRoutines) {
+  const flagged = new Set();
+  for (let i = 1; i < orderedRoutines.length; i++) {
+    if (isSmallGroup(orderedRoutines[i]) && isSmallGroup(orderedRoutines[i - 1])) {
+      flagged.add(orderedRoutines[i].id);
+      flagged.add(orderedRoutines[i - 1].id);
+    }
+  }
+  return flagged;
 }
 
 export function detectConflicts(orderedRoutines, buffer) {

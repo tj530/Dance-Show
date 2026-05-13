@@ -13,7 +13,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { detectConflicts } from '../utils/generator';
+import { detectConflicts, detectSmallGroupAdjacency } from '../utils/generator';
 
 const POSITION_LABELS = {
   opening: 'Opening',
@@ -35,7 +35,7 @@ function DragHandle(props) {
 }
 
 function SortableEntry({
-  entry, routine, conflict,
+  entry, routine, conflict, sizeConflict,
   onRemove, onEditIntermission,
   onEditRoutine, onLockPosition,
 }) {
@@ -67,7 +67,7 @@ function SortableEntry({
   const isFinale  = routine.position === 'finale';
 
   return (
-    <li ref={setNodeRef} style={style} className={`lineup-entry${conflict ? ' conflict' : ''}`}>
+    <li ref={setNodeRef} style={style} className={`lineup-entry${conflict ? ' conflict' : sizeConflict ? ' size-conflict' : ''}`}>
       <DragHandle {...attributes} {...listeners} />
       <div className="entry-content">
         <div className="entry-title">
@@ -75,7 +75,8 @@ function SortableEntry({
           {routine.position && (
             <span className="tag tag-position">{POSITION_LABELS[routine.position]}</span>
           )}
-          {conflict && <span className="conflict-badge">Conflict</span>}
+          {conflict     && <span className="conflict-badge">Dancer conflict</span>}
+          {sizeConflict && !conflict && <span className="size-conflict-badge">Adjacent small group</span>}
         </div>
         <div className="entry-details">
           {routine.style && <span className="tag tag-style">{routine.style}</span>}
@@ -135,7 +136,8 @@ export default function LineupView({
     .map(e => routineMap[e.routineId])
     .filter(Boolean);
 
-  const conflictIds = detectConflicts(orderedRoutines, settings.conflictBuffer);
+  const conflictIds      = detectConflicts(orderedRoutines, settings.conflictBuffer);
+  const smallGroupIds    = detectSmallGroupAdjacency(orderedRoutines);
 
   function handleDragEnd(event) {
     const { active, over } = event;
@@ -166,8 +168,9 @@ export default function LineupView({
   }
   if (currentAct.length > 0) acts.push({ actNum, entries: currentAct });
 
-  const routineCount  = lineup.filter(e => e.type === 'routine').length;
-  const conflictCount = conflictIds.size;
+  const routineCount     = lineup.filter(e => e.type === 'routine').length;
+  const conflictCount    = conflictIds.size;
+  const sizeConflictCount = [...smallGroupIds].filter(id => !conflictIds.has(id)).length;
 
   return (
     <div className="lineup-view card">
@@ -181,10 +184,15 @@ export default function LineupView({
         <div className="lineup-stats">
           {conflictCount > 0 && (
             <span className="conflict-summary">
-              {conflictCount} conflict{conflictCount > 1 ? 's' : ''}
+              {conflictCount} dancer conflict{conflictCount > 1 ? 's' : ''}
             </span>
           )}
-          {conflictCount === 0 && routineCount > 0 && (
+          {sizeConflictCount > 0 && (
+            <span className="size-conflict-summary" title="Adjacent solos, duos or trios">
+              {sizeConflictCount} size clash{sizeConflictCount > 1 ? 'es' : ''}
+            </span>
+          )}
+          {conflictCount === 0 && sizeConflictCount === 0 && routineCount > 0 && (
             <span className="no-conflict-summary">No conflicts</span>
           )}
           {liveOptimize && (
@@ -238,14 +246,16 @@ export default function LineupView({
                       )}
                       <ul className="lineup-list">
                         {act.entries.map(entry => {
-                          const routine  = routineMap[entry.routineId];
-                          const conflict = routine ? conflictIds.has(routine.id) : false;
+                          const routine      = routineMap[entry.routineId];
+                          const conflict     = routine ? conflictIds.has(routine.id)   : false;
+                          const sizeConflict = routine ? smallGroupIds.has(routine.id) : false;
                           return (
                             <SortableEntry
                               key={entry.id}
                               entry={entry}
                               routine={routine}
                               conflict={conflict}
+                              sizeConflict={sizeConflict}
                               onRemove={onRemoveEntry}
                               onEditIntermission={handleRenameIntermission}
                               onEditRoutine={onEditRoutine}
