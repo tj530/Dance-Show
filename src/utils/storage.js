@@ -1,6 +1,9 @@
+// localStorage keys — kept as constants so a typo won't silently create a second key
 const ROUTINES_KEY = 'dance_routines';
-const LINEUP_KEY = 'dance_lineup';
+const LINEUP_KEY   = 'dance_lineup';
 const SETTINGS_KEY = 'dance_settings';
+
+// Each load function falls back to a safe default if localStorage is empty or corrupted
 
 export function loadRoutines() {
   try { return JSON.parse(localStorage.getItem(ROUTINES_KEY)) || []; }
@@ -27,6 +30,7 @@ export function saveSettings(s) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
 }
 
+// Default settings used on first run or if stored settings are unreadable
 export function defaultSettings() {
   return { conflictBuffer: 2, numActs: 2, showName: 'Annual Dance Showcase' };
 }

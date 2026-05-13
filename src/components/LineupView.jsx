@@ -15,6 +15,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { detectConflicts, detectSmallGroupAdjacency } from '../utils/generator';
 
+// Human-readable labels for the special locked positions
 const POSITION_LABELS = {
   opening: 'Opening',
   finale: 'Finale',
@@ -22,6 +23,7 @@ const POSITION_LABELS = {
   'second-half-opener': 'Act 2 Opener',
 };
 
+// Six-dot SVG drag handle — more reliable than Unicode braille across fonts
 function DragHandle(props) {
   return (
     <span className="drag-handle" {...props}>
@@ -34,20 +36,27 @@ function DragHandle(props) {
   );
 }
 
+/**
+ * A single draggable row in the lineup.
+ * Handles both routine entries and intermission entries.
+ * Shows conflict badges and lock buttons for routine entries.
+ */
 function SortableEntry({
   entry, routine, conflict, sizeConflict,
   onRemove, onEditIntermission,
   onEditRoutine, onLockPosition,
 }) {
+  // dnd-kit hook — provides drag transform, listeners, and ref for the DOM node
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: entry.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.45 : 1,
+    opacity: isDragging ? 0.45 : 1, // fade while dragging so you can see the drop target
   };
 
+  // Intermission rows are simpler — just a label and a rename/delete button
   if (entry.type === 'intermission') {
     return (
       <li ref={setNodeRef} style={style} className="lineup-entry intermission">
@@ -61,12 +70,14 @@ function SortableEntry({
     );
   }
 
+  // If the routine was deleted but the lineup entry still exists, skip rendering
   if (!routine) return null;
 
   const isOpening = routine.position === 'opening';
   const isFinale  = routine.position === 'finale';
 
   return (
+    // Dancer conflict takes visual priority over size conflict
     <li ref={setNodeRef} style={style} className={`lineup-entry${conflict ? ' conflict' : sizeConflict ? ' size-conflict' : ''}`}>
       <DragHandle {...attributes} {...listeners} />
       <div className="entry-content">
@@ -75,6 +86,7 @@ function SortableEntry({
           {routine.position && (
             <span className="tag tag-position">{POSITION_LABELS[routine.position]}</span>
           )}
+          {/* Show at most one badge — dancer conflict is more important */}
           {conflict     && <span className="conflict-badge">Dancer conflict</span>}
           {sizeConflict && !conflict && <span className="size-conflict-badge">Adjacent small group</span>}
         </div>
@@ -90,6 +102,7 @@ function SortableEntry({
             ))}
           </div>
         )}
+        {/* Lock buttons — toggle the routine into the opening or finale slot */}
         <div className="entry-lock-row">
           <button
             className={`btn-lock${isOpening ? ' active' : ''}`}
@@ -115,6 +128,11 @@ function SortableEntry({
   );
 }
 
+/**
+ * The full draggable lineup view.
+ * Splits the lineup into act sections around any intermission entries,
+ * detects conflicts, and renders each entry as a SortableEntry.
+ */
 export default function LineupView({
   lineup,
   routines,
@@ -127,18 +145,22 @@ export default function LineupView({
   onLockPosition,
   liveOptimize,
 }) {
+  // PointerSensor works for both mouse and touch
   const sensors = useSensors(useSensor(PointerSensor));
 
+  // Build a lookup map so we can find the full routine object for each lineup entry
   const routineMap = Object.fromEntries(routines.map(r => [r.id, r]));
 
+  // Extract just the routines (not intermissions) in their current display order
   const orderedRoutines = lineup
     .filter(e => e.type === 'routine')
     .map(e => routineMap[e.routineId])
-    .filter(Boolean);
+    .filter(Boolean); // drop any orphaned entries whose routine was deleted
 
-  const conflictIds      = detectConflicts(orderedRoutines, settings.conflictBuffer);
-  const smallGroupIds    = detectSmallGroupAdjacency(orderedRoutines);
+  const conflictIds   = detectConflicts(orderedRoutines, settings.conflictBuffer);
+  const smallGroupIds = detectSmallGroupAdjacency(orderedRoutines);
 
+  // Reorder the lineup array when a drag completes
   function handleDragEnd(event) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -147,11 +169,13 @@ export default function LineupView({
     onLineupChange(arrayMove(lineup, oldIndex, newIndex));
   }
 
+  // Use window.prompt for intermission renaming — simple, no extra modal needed
   function handleRenameIntermission(entry) {
     const newLabel = window.prompt('Rename intermission:', entry.label);
     if (newLabel && newLabel.trim()) onRenameIntermission(entry.id, newLabel.trim());
   }
 
+  // Split the flat lineup array into act groups, separated at intermission entries
   const acts = [];
   let currentAct = [];
   let actNum = 1;
@@ -168,8 +192,9 @@ export default function LineupView({
   }
   if (currentAct.length > 0) acts.push({ actNum, entries: currentAct });
 
-  const routineCount     = lineup.filter(e => e.type === 'routine').length;
-  const conflictCount    = conflictIds.size;
+  const routineCount      = lineup.filter(e => e.type === 'routine').length;
+  const conflictCount     = conflictIds.size;
+  // Only count size conflicts that aren't also dancer conflicts (avoid double-counting in the header)
   const sizeConflictCount = [...smallGroupIds].filter(id => !conflictIds.has(id)).length;
 
   return (
@@ -217,10 +242,12 @@ export default function LineupView({
             </button>
           </div>
 
+          {/* DndContext wraps everything that participates in drag-and-drop */}
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={lineup.map(e => e.id)} strategy={verticalListSortingStrategy}>
               <div className="act-sections">
                 {acts.map((act, i) => {
+                  // Intermission acts render as a single entry in their own list
                   if (act.actNum === 'intermission') {
                     return (
                       <ul key={`intermission-${i}`} className="lineup-list">
@@ -241,6 +268,7 @@ export default function LineupView({
                   }
                   return (
                     <div key={`act-${i}`} className="act-section">
+                      {/* Only show act headings in a two-act show */}
                       {settings.numActs > 1 && (
                         <h3 className="act-heading">Act {act.actNum}</h3>
                       )}

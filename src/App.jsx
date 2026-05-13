@@ -16,28 +16,38 @@ import {
 import './App.css';
 
 export default function App() {
+  // Core data — persisted to localStorage via the save effects below
   const [routines, setRoutines]         = useState(() => loadRoutines());
   const [lineup, setLineup]             = useState(() => loadLineup());
   const [settings, setSettings]         = useState(() => loadSettings());
+
+  // Score log from the last optimizer run — fed into the Analytics charts
   const [scoreLog, setScoreLog]         = useState([]);
-  const [editingRoutine, setEditingRoutine] = useState(null);
+
+  // UI state
+  const [editingRoutine, setEditingRoutine] = useState(null);  // routine open in the edit modal
   const [showAddToLineup, setShowAddToLineup] = useState(false);
   const [activeTab, setActiveTab]       = useState('routines');
   const [toast, setToast]               = useState('');
+
+  // Live optimize — re-runs the optimizer automatically whenever routines or settings change
   const [liveOptimize, setLiveOptimize] = useState(false);
-  const liveOptimizeRef = useRef(liveOptimize);
+  const liveOptimizeRef = useRef(liveOptimize); // ref so the debounce timeout can read the latest value
   const debounceRef     = useRef(null);
 
+  // ── Persistence effects ───────────────────────────────────────
   useEffect(() => { saveRoutines(routines); }, [routines]);
   useEffect(() => { saveLineup(lineup); },   [lineup]);
   useEffect(() => { saveSettings(settings); }, [settings]);
   useEffect(() => { liveOptimizeRef.current = liveOptimize; }, [liveOptimize]);
 
   // ── Live optimize effect ──────────────────────────────────────
+  // Debounced so rapid changes (e.g. editing settings) don't fire the optimizer on every keystroke
   useEffect(() => {
     if (!liveOptimize || routines.length === 0) return;
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
+      // Check the ref, not the state — the state may be stale inside this closure
       if (!liveOptimizeRef.current) return;
       const { lineup: newLineup, scoreLog: log } = generateLineup(routines, settings);
       setLineup(newLineup);
@@ -46,18 +56,21 @@ export default function App() {
     return () => clearTimeout(debounceRef.current);
   }, [routines, settings, liveOptimize]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Show a temporary notification at the bottom of the screen
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
   }
 
   // ── Routines ──────────────────────────────────────────────────
+
   function addRoutine(r) {
     setRoutines(prev => [...prev, r]);
     showToast(`Added "${r.title}"`);
   }
 
   function deleteRoutine(id) {
+    // Remove the routine and any lineup entries that reference it
     setRoutines(prev => prev.filter(r => r.id !== id));
     setLineup(prev => prev.filter(e => e.routineId !== id));
     showToast('Routine removed');
@@ -65,6 +78,7 @@ export default function App() {
 
   function saveEditedRoutine(updated) {
     setRoutines(prev => prev.map(r => r.id === updated.id ? updated : r));
+    // Keep the lineup entry's display label in sync with the new title
     setLineup(prev => prev.map(e =>
       e.routineId === updated.id ? { ...e, label: updated.title } : e
     ));
@@ -73,18 +87,30 @@ export default function App() {
   }
 
   function handleImport(imported, mode) {
-    if (mode === 'replace') { setRoutines(imported); setLineup([]); }
-    else setRoutines(prev => [...prev, ...imported]);
+    if (mode === 'replace') {
+      // Replace all clears the existing lineup so stale entries don't remain
+      setRoutines(imported);
+      setLineup([]);
+    } else {
+      setRoutines(prev => [...prev, ...imported]);
+    }
     showToast(`Imported ${imported.length} routine(s)`);
   }
 
   // ── Lock position ─────────────────────────────────────────────
+
+  /**
+   * Lock a routine to a special position (opening or finale).
+   * Only one routine can hold each position — if another routine already holds it,
+   * that one's position is cleared first.
+   */
   function handleLockPosition(routineId, position) {
     setRoutines(prev => prev.map(r => {
       if (r.id !== routineId) return r;
       return { ...r, position: position || null };
     }));
     if (position === 'opening' || position === 'finale') {
+      // Clear the same position from any other routine that currently holds it
       setRoutines(prev => prev.map(r => {
         if (r.id === routineId) return { ...r, position };
         if (r.position === position) return { ...r, position: null };
@@ -95,12 +121,16 @@ export default function App() {
   }
 
   // ── Add to lineup ─────────────────────────────────────────────
+
   function handleAddToLineup(routine, isNew) {
+    // If creating a brand-new routine, add it to the routines list too
     if (isNew) setRoutines(prev => [...prev, routine]);
     const entry = {
       id: `entry-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      type: 'routine', routineId: routine.id,
-      label: routine.title, act: routine.act || 1,
+      type: 'routine',
+      routineId: routine.id,
+      label: routine.title,
+      act: routine.act || 1,
     };
     setLineup(prev => [...prev, entry]);
     setShowAddToLineup(false);
@@ -108,10 +138,12 @@ export default function App() {
   }
 
   // ── Live optimize toggle ──────────────────────────────────────
+
   function toggleLiveOptimize() {
     setLiveOptimize(prev => {
       const next = !prev;
       if (next && routines.length > 0) {
+        // Run immediately on enable, then the useEffect takes over for future changes
         const { lineup: newLineup, scoreLog: log } = generateLineup(routines, settings);
         setLineup(newLineup);
         setScoreLog(log);
@@ -125,6 +157,7 @@ export default function App() {
   }
 
   // ── Manual optimize ───────────────────────────────────────────
+
   function handleGenerate() {
     if (routines.length === 0) { showToast('Add some routines first!'); return; }
     const { lineup: newLineup, scoreLog: log } = generateLineup(routines, settings);
@@ -135,20 +168,36 @@ export default function App() {
   }
 
   // ── Lineup helpers ────────────────────────────────────────────
+
   function addIntermission() {
     setLineup(prev => [...prev, {
-      id: `entry-${Date.now()}`, type: 'intermission',
-      routineId: null, label: 'Intermission', act: 1,
+      id: `entry-${Date.now()}`,
+      type: 'intermission',
+      routineId: null,
+      label: 'Intermission',
+      act: 1,
     }]);
   }
 
-  function removeEntry(id)              { setLineup(prev => prev.filter(e => e.id !== id)); }
-  function renameIntermission(id, label){ setLineup(prev => prev.map(e => e.id === id ? { ...e, label } : e)); }
-
-  function clearLineup() {
-    if (window.confirm('Clear the entire lineup?')) { setLineup([]); showToast('Lineup cleared'); }
+  function removeEntry(id) {
+    setLineup(prev => prev.filter(e => e.id !== id));
   }
 
+  function renameIntermission(id, label) {
+    setLineup(prev => prev.map(e => e.id === id ? { ...e, label } : e));
+  }
+
+  function clearLineup() {
+    if (window.confirm('Clear the entire lineup?')) {
+      setLineup([]);
+      showToast('Lineup cleared');
+    }
+  }
+
+  /**
+   * Export the current lineup as a CSV file and trigger a browser download.
+   * Includes both routine entries and intermissions, in display order.
+   */
   function exportLineup() {
     const routineMap = Object.fromEntries(routines.map(r => [r.id, r]));
     const headers = ['order', 'type', 'title', 'students', 'act', 'position', 'style', 'level'];
@@ -157,8 +206,13 @@ export default function App() {
         return { order: i + 1, type: 'intermission', title: entry.label, students: '', act: '', position: '', style: '', level: '' };
       }
       const r = routineMap[entry.routineId] || {};
-      return { order: i + 1, type: 'routine', title: r.title || '', students: (r.students || []).join('; '),
-               act: r.act || '', position: r.position || '', style: r.style || '', level: r.level || '' };
+      return {
+        order: i + 1, type: 'routine',
+        title: r.title || '',
+        students: (r.students || []).join('; '),
+        act: r.act || '', position: r.position || '',
+        style: r.style || '', level: r.level || '',
+      };
     });
     const csv = [headers.join(','), ...rows.map(row =>
       headers.map(h => `"${String(row[h]).replace(/"/g, '""')}"`).join(',')
@@ -166,14 +220,16 @@ export default function App() {
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = `${settings.showName.replace(/\s+/g, '_')}_lineup.csv`;
-    a.click(); URL.revokeObjectURL(url);
+    a.href = url;
+    a.download = `${settings.showName.replace(/\s+/g, '_')}_lineup.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
     showToast('Lineup exported!');
   }
 
+  // Set of routineIds already in the lineup — used by AddRoutineModal to filter the "pick existing" list
   const lineupRoutineIds = new Set(lineup.map(e => e.routineId).filter(Boolean));
   const ALL_TABS = ['routines', 'lineup', 'analytics', 'import'];
-
   const TAB_LABELS = { routines: 'Routines', lineup: 'Lineup', analytics: 'Analytics', import: 'Import' };
 
   return (
@@ -250,11 +306,13 @@ export default function App() {
         )}
       </main>
 
+      {/* Edit modal — opens when a routine's Edit button is clicked */}
       {editingRoutine && (
         <EditRoutineModal routine={editingRoutine} numActs={settings.numActs}
           onSave={saveEditedRoutine} onClose={() => setEditingRoutine(null)} />
       )}
 
+      {/* Add-to-lineup modal — pick an existing routine or create a new one */}
       {showAddToLineup && (
         <AddRoutineModal routines={routines} lineupRoutineIds={lineupRoutineIds}
           numActs={settings.numActs} onAdd={handleAddToLineup}
