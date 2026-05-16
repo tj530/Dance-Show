@@ -227,7 +227,62 @@ export default function App() {
     showToast('Lineup exported!');
   }
 
-  // Set of routineIds already in the lineup — used by AddRoutineModal to filter the "pick existing" list
+  /**
+   * Export a dancer report — one row per dancer showing every routine they appear in,
+   * listed in lineup order with their slot number.
+   * Format: Dancer | Number of routines | Slot 1 title | Slot 2 title | …
+   */
+  function exportDancers() {
+    const routineMap = Object.fromEntries(routines.map(r => [r.id, r]));
+
+    // Walk the lineup in order, collecting slot number + title for each dancer
+    const dancerMap = new Map(); // name → [{ slot, title }]
+    let slot = 1;
+    for (const entry of lineup) {
+      if (entry.type === 'intermission') continue;
+      const r = routineMap[entry.routineId];
+      if (!r) continue;
+      for (const dancer of r.students) {
+        if (!dancerMap.has(dancer)) dancerMap.set(dancer, []);
+        dancerMap.get(dancer).push({ slot, title: r.title });
+      }
+      slot++;
+    }
+
+    // Sort dancers alphabetically
+    const sorted = [...dancerMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+    // Find the maximum number of routines any dancer has (to set column count)
+    const maxRoutines = sorted.reduce((m, [, entries]) => Math.max(m, entries.length), 0);
+
+    const headers = [
+      'Dancer',
+      'Number of Routines',
+      ...Array.from({ length: maxRoutines }, (_, i) => `Routine ${i + 1}`),
+    ];
+
+    const rows = sorted.map(([name, entries]) => [
+      name,
+      entries.length,
+      ...entries.map(e => `#${e.slot} ${e.title}`),
+    ]);
+
+    const escape = v => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = [
+      headers.map(escape).join(','),
+      ...rows.map(row => row.map(escape).join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `${settings.showName.replace(/\s+/g, '_')}_dancers.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Dancer list exported!');
+  }
+
   const lineupRoutineIds = new Set(lineup.map(e => e.routineId).filter(Boolean));
   const ALL_TABS = ['routines', 'lineup', 'analytics', 'import'];
   const TAB_LABELS = { routines: 'Routines', lineup: 'Lineup', analytics: 'Analytics', import: 'Import' };
@@ -280,7 +335,8 @@ export default function App() {
             <div className="lineup-toolbar">
               <button className="btn-primary btn-add-routine" onClick={() => setShowAddToLineup(true)}>Add Routine</button>
               <button className="btn-secondary" onClick={clearLineup}>Clear</button>
-              {lineup.length > 0 && <button className="btn-secondary" onClick={exportLineup}>Export CSV</button>}
+              {lineup.length > 0 && <button className="btn-secondary" onClick={exportLineup}>Export Lineup</button>}
+              {lineup.length > 0 && <button className="btn-secondary" onClick={exportDancers}>Export Dancers</button>}
             </div>
             <LineupView
               lineup={lineup} routines={routines} settings={settings}
