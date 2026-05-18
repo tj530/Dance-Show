@@ -120,14 +120,16 @@ export function hasConflict(routine, placed, buffer) {
 /**
  * Insert routines one at a time, always choosing the position that gives
  * the lowest score for the whole lineup so far.
- * `base` contains any pinned routines already fixed at the front.
+ * `base` contains any pinned routines already fixed at the front —
+ * we never insert before them, so we start scanning from base.length.
  */
 function greedyInsert(base, toPlace, buffer) {
   let placed = [...base];
   for (const r of toPlace) {
     let bestScore = Infinity;
     let bestPos   = placed.length; // default: append at end
-    for (let pos = 0; pos <= placed.length; pos++) {
+    // Start from base.length — position 0..base.length-1 are reserved for the pinned opener
+    for (let pos = base.length; pos <= placed.length; pos++) {
       const candidate = [...placed.slice(0, pos), r, ...placed.slice(pos)];
       const s = scoreLineup(candidate, buffer);
       if (s < bestScore) { bestScore = s; bestPos = pos; }
