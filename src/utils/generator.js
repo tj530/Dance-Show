@@ -81,6 +81,23 @@ export function scoreLineup(orderedRoutines, buffer) {
 }
 
 /**
+ * Return the IDs of all routines that share an identical cast with at least
+ * one other routine in the list. Used by LineupView to highlight these pairs.
+ */
+export function detectIdenticalCastGroups(orderedRoutines) {
+  const flagged = new Set();
+  for (let i = 0; i < orderedRoutines.length; i++) {
+    for (let j = i + 1; j < orderedRoutines.length; j++) {
+      if (sameExactCast(orderedRoutines[i], orderedRoutines[j])) {
+        flagged.add(orderedRoutines[i].id);
+        flagged.add(orderedRoutines[j].id);
+      }
+    }
+  }
+  return flagged;
+}
+
+/**
  * Return the IDs of routines that are adjacent to another solo/duo/trio.
  * Used by LineupView to highlight these entries.
  */

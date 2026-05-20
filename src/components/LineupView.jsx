@@ -13,7 +13,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { detectConflicts, detectSmallGroupAdjacency } from '../utils/generator';
+import { detectConflicts, detectSmallGroupAdjacency, detectIdenticalCastGroups } from '../utils/generator';
 
 // Human-readable labels for the special locked positions
 const POSITION_LABELS = {
@@ -42,7 +42,7 @@ function DragHandle(props) {
  * Shows conflict badges and lock buttons for routine entries.
  */
 function SortableEntry({
-  entry, routine, conflict, sizeConflict,
+  entry, routine, conflict, sizeConflict, sameCast,
   onRemove, onEditIntermission,
   onEditRoutine, onLockPosition,
 }) {
@@ -77,8 +77,8 @@ function SortableEntry({
   const isFinale  = routine.position === 'finale';
 
   return (
-    // Dancer conflict takes visual priority over size conflict
-    <li ref={setNodeRef} style={style} className={`lineup-entry${conflict ? ' conflict' : sizeConflict ? ' size-conflict' : ''}`}>
+    // Dancer conflict takes visual priority over size conflict, then same-cast highlight
+    <li ref={setNodeRef} style={style} className={`lineup-entry${conflict ? ' conflict' : sizeConflict ? ' size-conflict' : sameCast ? ' same-cast' : ''}`}>
       <DragHandle {...attributes} {...listeners} />
       <div className="entry-content">
         <div className="entry-title">
@@ -86,9 +86,10 @@ function SortableEntry({
           {routine.position && (
             <span className="tag tag-position">{POSITION_LABELS[routine.position]}</span>
           )}
-          {/* Show at most one badge — dancer conflict is more important */}
-          {conflict     && <span className="conflict-badge">Dancer conflict</span>}
-          {sizeConflict && !conflict && <span className="size-conflict-badge">Adjacent small group</span>}
+          {/* Conflict badges — dancer conflict takes priority */}
+          {conflict                       && <span className="conflict-badge">Dancer conflict</span>}
+          {sizeConflict && !conflict      && <span className="size-conflict-badge">Adjacent small group</span>}
+          {sameCast     && !conflict      && <span className="same-cast-badge">Same group</span>}
         </div>
         <div className="entry-details">
           {routine.style && <span className="tag tag-style">{routine.style}</span>}
@@ -174,6 +175,11 @@ export default function LineupView({
     detectConflicts(group, settings.conflictBuffer).forEach(id => conflictIds.add(id));
     detectSmallGroupAdjacency(group).forEach(id => smallGroupIds.add(id));
   }
+
+  // Identical-cast detection runs across the whole show (not per-act) —
+  // a group performing in both acts should still be highlighted
+  const allRoutines  = lineup.filter(e => e.type === 'routine').map(e => routineMap[e.routineId]).filter(Boolean);
+  const sameCastIds  = detectIdenticalCastGroups(allRoutines);
 
   // Reorder the lineup array when a drag completes
   function handleDragEnd(event) {
@@ -292,6 +298,7 @@ export default function LineupView({
                           const routine      = routineMap[entry.routineId];
                           const conflict     = routine ? conflictIds.has(routine.id)   : false;
                           const sizeConflict = routine ? smallGroupIds.has(routine.id) : false;
+                          const sameCast     = routine ? sameCastIds.has(routine.id)   : false;
                           return (
                             <SortableEntry
                               key={entry.id}
@@ -299,6 +306,7 @@ export default function LineupView({
                               routine={routine}
                               conflict={conflict}
                               sizeConflict={sizeConflict}
+                              sameCast={sameCast}
                               onRemove={onRemoveEntry}
                               onEditIntermission={handleRenameIntermission}
                               onEditRoutine={onEditRoutine}
