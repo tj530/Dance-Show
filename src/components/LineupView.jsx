@@ -151,14 +151,29 @@ export default function LineupView({
   // Build a lookup map so we can find the full routine object for each lineup entry
   const routineMap = Object.fromEntries(routines.map(r => [r.id, r]));
 
-  // Extract just the routines (not intermissions) in their current display order
-  const orderedRoutines = lineup
-    .filter(e => e.type === 'routine')
-    .map(e => routineMap[e.routineId])
-    .filter(Boolean); // drop any orphaned entries whose routine was deleted
+  // Split the lineup into per-act groups at each intermission.
+  // Conflict detection runs independently per act — a dancer can appear in the
+  // last routine of Act 1 AND the first routine of Act 2 without it being a conflict,
+  // because the intermission is a real break between them.
+  const actGroups = [];
+  let currentGroup = [];
+  for (const entry of lineup) {
+    if (entry.type === 'intermission') {
+      actGroups.push(currentGroup);
+      currentGroup = [];
+    } else {
+      const r = routineMap[entry.routineId];
+      if (r) currentGroup.push(r);
+    }
+  }
+  actGroups.push(currentGroup);
 
-  const conflictIds   = detectConflicts(orderedRoutines, settings.conflictBuffer);
-  const smallGroupIds = detectSmallGroupAdjacency(orderedRoutines);
+  const conflictIds   = new Set();
+  const smallGroupIds = new Set();
+  for (const group of actGroups) {
+    detectConflicts(group, settings.conflictBuffer).forEach(id => conflictIds.add(id));
+    detectSmallGroupAdjacency(group).forEach(id => smallGroupIds.add(id));
+  }
 
   // Reorder the lineup array when a drag completes
   function handleDragEnd(event) {
