@@ -42,7 +42,7 @@ function DragHandle(props) {
  * Shows conflict badges and lock buttons for routine entries.
  */
 function SortableEntry({
-  entry, routine, conflict, sizeConflict, sameCast,
+  entry, routine, conflict, sizeConflict, sameCast, slotNumber,
   onRemove, onEditIntermission,
   onEditRoutine, onLockPosition,
 }) {
@@ -80,6 +80,7 @@ function SortableEntry({
     // Dancer conflict takes visual priority over size conflict, then same-cast highlight
     <li ref={setNodeRef} style={style} className={`lineup-entry${conflict ? ' conflict' : sizeConflict ? ' size-conflict' : sameCast ? ' same-cast' : ''}`}>
       <DragHandle {...attributes} {...listeners} />
+      <span className="slot-number">#{slotNumber}</span>
       <div className="entry-content">
         <div className="entry-title">
           <strong>{routine.title}</strong>
@@ -196,6 +197,13 @@ export default function LineupView({
     if (newLabel && newLabel.trim()) onRenameIntermission(entry.id, newLabel.trim());
   }
 
+  // Pre-compute slot numbers (1, 2, 3…) for routine entries only — intermissions don't count
+  const slotNumbers = {};
+  let slot = 0;
+  for (const entry of lineup) {
+    if (entry.type === 'routine') slotNumbers[entry.id] = ++slot;
+  }
+
   // Split the flat lineup array into act groups, separated at intermission entries
   const acts = [];
   let currentAct = [];
@@ -307,6 +315,7 @@ export default function LineupView({
                               conflict={conflict}
                               sizeConflict={sizeConflict}
                               sameCast={sameCast}
+                              slotNumber={slotNumbers[entry.id]}
                               onRemove={onRemoveEntry}
                               onEditIntermission={handleRenameIntermission}
                               onEditRoutine={onEditRoutine}

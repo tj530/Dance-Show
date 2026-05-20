@@ -663,6 +663,16 @@ select option { background: var(--surface2); }
   flex: 1;
 }
 
+.slot-number {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-faint);
+  min-width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
 .drag-handle {
   color: var(--text-faint);
   cursor: grab;
