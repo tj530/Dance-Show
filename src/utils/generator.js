@@ -37,6 +37,17 @@ function isSmallGroup(routine) {
   return n >= 1 && n <= 3;
 }
 
+/**
+ * Returns true if two routines have the exact same set of dancers.
+ * These routines are exempt from conflict penalties — the same group
+ * performing twice can be placed close together without issue.
+ */
+function sameExactCast(r1, r2) {
+  if (r1.students.length === 0 || r1.students.length !== r2.students.length) return false;
+  const s = new Set(r1.students);
+  return r2.students.every(x => s.has(x));
+}
+
 // ── Scoring ───────────────────────────────────────────────────────────────────
 
 /**
@@ -47,8 +58,11 @@ export function scoreLineup(orderedRoutines, buffer) {
   let score = 0;
 
   for (let i = 0; i < orderedRoutines.length; i++) {
-    // Check this routine against the previous `buffer` routines for shared dancers
+    // Check this routine against the previous `buffer` routines for shared dancers.
+    // Skip pairs with an identical cast — the same group performing twice is intentional
+    // and can be placed close together without needing a change gap.
     for (let j = Math.max(0, i - buffer); j < i; j++) {
+      if (sameExactCast(orderedRoutines[i], orderedRoutines[j])) continue;
       const shared = sharedStudentCount(orderedRoutines[i], orderedRoutines[j]);
       if (shared > 0) {
         const gap       = i - j;                 // how far apart they are
@@ -90,6 +104,8 @@ export function detectConflicts(orderedRoutines, buffer) {
   for (let i = 0; i < orderedRoutines.length; i++) {
     const students = new Set(orderedRoutines[i].students);
     for (let j = Math.max(0, i - buffer); j < i; j++) {
+      // Identical-cast routines are exempt — same group performing twice is not a conflict
+      if (sameExactCast(orderedRoutines[i], orderedRoutines[j])) continue;
       for (const s of orderedRoutines[j].students) {
         if (students.has(s)) {
           conflictIds.add(orderedRoutines[i].id);
