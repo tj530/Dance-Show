@@ -885,6 +885,59 @@ select option { background: var(--surface2); }
   padding: 2px 6px;
 }
 
+/* ── Reset Page ──────────────────────────────────────────────── */
+.reset-page { max-width: 560px; }
+
+.reset-card h2 { margin-bottom: 6px; }
+
+.reset-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.reset-actions { display: flex; flex-direction: column; gap: 0; }
+
+.reset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.reset-row:last-child { border-bottom: none; }
+
+.reset-row-destructive { padding-top: 20px; }
+
+.reset-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.reset-row-info strong { font-size: 13px; color: var(--text); }
+.reset-row-info span   { font-size: 12px; color: var(--text-muted); }
+
+.btn-danger {
+  background: var(--danger-dim);
+  border: 1px solid rgba(248,113,113,0.3);
+  color: var(--danger);
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.btn-danger:hover {
+  background: rgba(248,113,113,0.2);
+  border-color: var(--danger);
+}
+
 /* ── Visualization Panel ─────────────────────────────────────── */
 .viz-panel { padding: 0; }
 

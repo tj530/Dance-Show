@@ -12,6 +12,7 @@ import {
   loadRoutines, saveRoutines,
   loadLineup, saveLineup,
   loadSettings, saveSettings,
+  defaultSettings,
 } from './utils/storage';
 import './App.css';
 
@@ -284,8 +285,8 @@ export default function App() {
   }
 
   const lineupRoutineIds = new Set(lineup.map(e => e.routineId).filter(Boolean));
-  const ALL_TABS = ['routines', 'lineup', 'analytics', 'import'];
-  const TAB_LABELS = { routines: 'Routines', lineup: 'Lineup', analytics: 'Analytics', import: 'Import' };
+  const ALL_TABS = ['routines', 'lineup', 'analytics', 'import', 'reset'];
+  const TAB_LABELS = { routines: 'Routines', lineup: 'Lineup', analytics: 'Analytics', import: 'Import', reset: 'Reset' };
 
   return (
     <div className="app">
@@ -358,6 +359,54 @@ export default function App() {
         {activeTab === 'import' && (
           <div className="import-page">
             <ImportPanel onImport={handleImport} />
+          </div>
+        )}
+
+        {activeTab === 'reset' && (
+          <div className="reset-page">
+            <div className="reset-card card">
+              <h2>Reset Data</h2>
+              <p className="reset-desc">Remove data from the app. These actions cannot be undone.</p>
+
+              <div className="reset-actions">
+                <div className="reset-row">
+                  <div className="reset-row-info">
+                    <strong>Clear lineup</strong>
+                    <span>Removes all entries from the lineup. Routines are kept.</span>
+                  </div>
+                  <button className="btn-danger" onClick={() => {
+                    if (window.confirm('Clear the lineup? Routines will not be deleted.')) {
+                      setLineup([]); showToast('Lineup cleared');
+                    }
+                  }}>Clear Lineup</button>
+                </div>
+
+                <div className="reset-row">
+                  <div className="reset-row-info">
+                    <strong>Remove all routines</strong>
+                    <span>Deletes every routine and clears the lineup.</span>
+                  </div>
+                  <button className="btn-danger" onClick={() => {
+                    if (window.confirm('Delete all routines and clear the lineup?')) {
+                      setRoutines([]); setLineup([]); showToast('All routines removed');
+                    }
+                  }}>Remove All Routines</button>
+                </div>
+
+                <div className="reset-row reset-row-destructive">
+                  <div className="reset-row-info">
+                    <strong>Reset everything</strong>
+                    <span>Deletes all routines, clears the lineup, and resets show settings to defaults.</span>
+                  </div>
+                  <button className="btn-danger" onClick={() => {
+                    if (window.confirm('Reset everything? This will delete all routines, clear the lineup, and restore default settings.')) {
+                      setRoutines([]); setLineup([]); setSettings(defaultSettings());
+                      showToast('Everything reset');
+                    }
+                  }}>Reset Everything</button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </main>
