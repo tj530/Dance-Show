@@ -102,7 +102,9 @@ export function parseCSV(file) {
           if (isDSPFormat(fields)) {
             resolve({ isDSP: true, classes: parseDSPRows(data) });
           } else {
-            resolve({ isDSP: false, routines: data.map((row, i) => parseRow(row, i)) });
+            // Skip intermission rows when re-importing a previously exported lineup
+            const routineRows = data.filter(row => (row.type || '').toLowerCase() !== 'intermission');
+            resolve({ isDSP: false, routines: routineRows.map((row, i) => parseRow(row, i)) });
           }
         } catch (e) {
           reject(e);
